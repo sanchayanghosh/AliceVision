@@ -231,9 +231,9 @@ namespace alicevision {
                 }
                 // spline curve
                 else { // if (kind==Spline) {
-                    double a = (x[k_hi] - t) / h;
-                    double b = (t - x[k_lo]) / h;
-                    double r = a * y[k_lo] + b * y[k_hi] + ((a * a * a - a) * ypp[k_lo] + (b * b * b - b) * ypp[k_hi]) * (h * h) * 0.1666666666666666666666666666666;
+                    const double a = (x[k_hi] - t) / h;
+                    const double b = (t - x[k_lo]) / h;
+                    const double r = a * y[k_lo] + b * y[k_hi] + ((a * a * a - a) * ypp[k_lo] + (b * b * b - b) * ypp[k_hi]) * (h * h) * 0.1666666666666666666666666666666;
                     return (r > 0.0 ? (r < 1.0 ? r : 1.0) : 0.0);
                 }
 
