@@ -49,7 +49,7 @@ namespace alicevision
             { 0.0286869, -0.1406752,  1.3487655}
         };
 
-        typedef struct DCPProfileApplyParams {
+       struct DCPProfileApplyParams {
             bool apply_hue_shift;
             bool apply_baseline_exposure_offset;
             bool use_tone_curve;
@@ -65,7 +65,7 @@ namespace alicevision
                 working_space = "sRGB";
             }
 
-        } DCPProfileApplyParams;
+        };
 
         typedef struct DCPProfileInfo {
             bool has_color_matrix_1;
