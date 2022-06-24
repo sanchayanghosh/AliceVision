@@ -70,10 +70,10 @@ namespace alicevision
                 }
                 else
                 {
-                    int idx = (int)index;
-                    float diff = index - (float)idx;
-                    float p1 = data[idx];
-                    float p2 = data[idx + 1] - p1;
+                    const int idx = (int)index;
+                    const float diff = index - (float)idx;
+                    const float p1 = data[idx];
+                    const float p2 = data[idx + 1] - p1;
                     return (p1 + p2 * diff);
                 }
             }
