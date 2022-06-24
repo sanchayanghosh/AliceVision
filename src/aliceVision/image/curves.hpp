@@ -29,8 +29,8 @@ namespace alicevision
 
             }
 
-            avLUTf() {};
-            ~avLUTf() {};
+            avLUTf() = default;
+            ~avLUTf() = default;
 
             avLUTf(int s)
             {
