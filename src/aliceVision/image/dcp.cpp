@@ -183,13 +183,13 @@ class Tag
 {
 
 public:
-    unsigned short tagID;
-    TagType        type;
-    unsigned int   datasize;
-    unsigned char* value;
-    Endianness     order;
+    unsigned short tagID{0};
+    TagType        type{TagType::T_INVALID};
+    unsigned int   datasize{0};
+    unsigned char* value{nullptr};
+    Endianness     order{Endianness::UNKNOWN};
 
-    Tag() { tagID = 0; type = TagType::T_INVALID; datasize = 0; value = NULL; order = Endianness::UNKNOWN; };
+    Tag() = default;
     Tag(unsigned short tag, TagType type, unsigned int datasize, Endianness order, FILE* f);
 
     ~Tag();
