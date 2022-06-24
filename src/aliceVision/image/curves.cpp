@@ -55,7 +55,7 @@ namespace alicevision {
 
         inline void AdobeToneCurve::RGBTone(float& maxval, float& medval, float& minval) const
         {
-            float minvalold = minval, medvalold = medval, maxvalold = maxval;
+            const float minvalold = minval, medvalold = medval, maxvalold = maxval;
 
             maxval = lutToneCurve[maxvalold];
             minval = lutToneCurve[minvalold];
