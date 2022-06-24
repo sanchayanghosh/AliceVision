@@ -176,8 +176,8 @@ namespace alicevision {
             ypp[0] = u[0] = 0.0;    /* set lower boundary condition to "natural" */
 
             for (int i = 1; i < N - 1; ++i) {
-                double sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
-                double p = sig * ypp[i - 1] + 2.0;
+                const double sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
+                const double p = sig * ypp[i - 1] + 2.0;
                 ypp[i] = (sig - 1.0) / p;
                 u[i] = ((y[i + 1] - y[i])
                     / (x[i + 1] - x[i]) - (y[i] - y[i - 1]) / (x[i] - x[i - 1]));
