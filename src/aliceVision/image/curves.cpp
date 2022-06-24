@@ -11,9 +11,9 @@ namespace alicevision {
         void AdobeToneCurve::Apply(float& ir, float& ig, float& ib) const
         {
 
-            float r = std::max<float>(0.0, std::min<float>(65535.0, ir));
-            float g = std::max<float>(0.0, std::min<float>(65535.0, ig));
-            float b = std::max<float>(0.0, std::min<float>(65535.0, ib));
+            const float r = std::max<float>(0.0, std::min<float>(65535.0, ir));
+            const float g = std::max<float>(0.0, std::min<float>(65535.0, ig));
+            const float b = std::max<float>(0.0, std::min<float>(65535.0, ib));
 
             if (r >= g) {
                 if (g > b) {
