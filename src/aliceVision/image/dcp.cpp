@@ -220,7 +220,6 @@ Tag::Tag(unsigned short tag, TagType type, unsigned int datasize, Endianness ord
     value[readSize] = '\0';
 }
 
-Tag::~Tag() {}
 
 bool Tag::operator==(const Tag& t) const
 {
