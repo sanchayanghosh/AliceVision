@@ -73,7 +73,7 @@ namespace alicevision {
             lutToneCurve(65536);
 
             if (gamma <= 0.0 || gamma == 1.) {
-                for (int i = 0; i < 65536; i++) {
+                for (int i = 0; i < 65536; ++i) {
                     lutToneCurve[i] = (float)pCurve.getVal(float(i) / 65535.f) * 65535.f;
                 }
 
