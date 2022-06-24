@@ -25,5 +25,7 @@
 #include "aliceVision/image/convolution.hpp"
 #include "aliceVision/image/Sampler.hpp"
 #include "aliceVision/image/convertionOpenCV.hpp"
+#include "aliceVision/image/curves.hpp"
+#include "aliceVision/image/dcp.hpp"
 
 

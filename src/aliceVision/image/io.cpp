@@ -357,6 +357,21 @@ void readImage(const std::string& path,
   const std::string& colorSpace = inBuf.spec().get_string_attribute("oiio:ColorSpace", "sRGB"); // default image color space is sRGB
   ALICEVISION_LOG_TRACE("Read image " << path << " (encoded in " << colorSpace << " colorspace).");
 
+  // Apply color profile if any (raw image only)
+  if (!imageReadOptions.colorProfileFileName.empty())
+  {
+      alicevision::image::DCPProfile colorProfile(imageReadOptions.colorProfileFileName);
+
+      //inBuf.get_pixels(inBuf.roi(), format, image.data());
+      alicevision::image::DCPProfileApplyParams DCPparams;
+
+      colorProfile.apply(inBuf, DCPparams);
+
+      //inBuf.set_pixels(inBuf.roi(), format, image.data());
+  }
+
+
+
   if(imageReadOptions.outputColorSpace == EImageColorSpace::SRGB) // color conversion to sRGB
   {
     if (colorSpace != "sRGB")
