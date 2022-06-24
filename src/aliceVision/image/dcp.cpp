@@ -192,7 +192,7 @@ public:
     Tag() = default;
     Tag(unsigned short tag, TagType type, unsigned int datasize, Endianness order, FILE* f);
 
-    ~Tag();
+    ~Tag() = default;
 
     bool operator==(const Tag& t) const;
 
