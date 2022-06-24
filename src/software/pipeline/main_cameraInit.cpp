@@ -131,7 +131,7 @@ inline std::istream& operator>>(std::istream& in, EGroupCameraFallback& s)
     return in;
 }
 
-std::list<std::string>::iterator findColorProfile(std::pair<std::string, std::string>& p, std::list<std::string>& fileList)
+std::list<std::string>::iterator findColorProfile(const std::pair<std::string, std::string>& p, const std::list<std::string>& fileList)
 {
     std::list<std::string>::iterator it = fileList.begin();
     bool found = false;
