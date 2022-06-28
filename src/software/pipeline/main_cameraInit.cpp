@@ -28,7 +28,8 @@
 #include <vector>
 #include <cstdlib>
 #include <stdexcept>
-
+#include <algorithm>
+#include <iterator>
 
 // These constants define the current software version.
 // They must be updated when the command line is changed.
@@ -131,17 +132,12 @@ inline std::istream& operator>>(std::istream& in, EGroupCameraFallback& s)
     return in;
 }
 
-std::list<std::string>::iterator findColorProfile(const std::pair<std::string, std::string>& p, const std::list<std::string>& fileList)
+std::list<std::string>::iterator findColorProfile(const std::pair<std::string, std::string>& p, std::list<std::string>& fileList)
 {
-    std::list<std::string>::iterator it = fileList.begin();
-    bool found = false;
-    while (it != fileList.end() && !found)
-    {
-        found = (it->find(p.first) != std::string::npos) && (it->find(p.second) != std::string::npos);
-        if (!found)
-            ++it;
-    }
-    return it;
+    return std::find_if(fileList.begin(), fileList.end(), [p](const std::string& s)
+        {
+            return (s.find(p.first) != std::string::npos) && (s.find(p.second) != std::string::npos);
+        });
 }
 
 /**

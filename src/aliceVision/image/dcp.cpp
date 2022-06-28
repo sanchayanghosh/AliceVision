@@ -133,7 +133,7 @@ enum class TagKey : int {
 //-----------------------------------------------------------------------------
 // Reading Endianness dependent data
 //-----------------------------------------------------------------------------
-unsigned short sget2(unsigned char* s, Endianness order)
+unsigned short sget2(const unsigned char* s, Endianness order)
 {
     if (order == Endianness::LITTLE) {
         return s[0] | s[1] << 8;
@@ -142,8 +142,7 @@ unsigned short sget2(unsigned char* s, Endianness order)
         return s[0] << 8 | s[1];
     }
 }
-
-int sget4(unsigned char* s, Endianness order)
+int sget4(const unsigned char* s, Endianness order)
 {
     if (order == Endianness::LITTLE) {
         return s[0] | s[1] << 8 | s[2] << 16 | s[3] << 24;
@@ -152,21 +151,18 @@ int sget4(unsigned char* s, Endianness order)
         return s[0] << 24 | s[1] << 16 | s[2] << 8 | s[3];
     }
 }
-
 inline unsigned short get2(FILE* f, Endianness order)
 {
     unsigned char str[2] = { 0xff, 0xff };
     fread(str, 1, 2, f);
     return sget2(str, order);
 }
-
 int get4(FILE* f, Endianness order)
 {
     unsigned char str[4] = { 0xff, 0xff, 0xff, 0xff };
     fread(str, 1, 4, f);
     return sget4(str, order);
 }
-
 short int int2_to_signed(short unsigned int i)
 {
     union {
@@ -178,7 +174,9 @@ short int int2_to_signed(short unsigned int i)
 }
 
 
-// a class representing a single tag
+/*
+ * A class representing a single TIFF tag
+ */
 class Tag
 {
 
@@ -186,7 +184,7 @@ public:
     unsigned short tagID{0};
     TagType        type{TagType::T_INVALID};
     unsigned int   datasize{0};
-    unsigned char* value{nullptr};
+    std::vector<unsigned char> v_value;
     Endianness     order{Endianness::UNKNOWN};
 
     Tag() = default;
@@ -208,18 +206,19 @@ Tag::Tag(unsigned short tag, TagType type, unsigned int datasize, Endianness ord
 {
 
     // load value field (possibly seek before)
-    int valuesize = datasize * getTypeSize(type);
+    const int valuesize = datasize * getTypeSize(type);
 
     if (valuesize > 4) {
         fseek(f, get4(f, order), SEEK_SET);
     }
 
     // read value
-    value = new unsigned char[valuesize + 1];
-    auto readSize = fread(value, 1, valuesize, f);
-    value[readSize] = '\0';
+    //value = new unsigned char[valuesize + 1];
+    v_value.resize(valuesize + 1);
+    auto readSize = fread(v_value.data(), 1, valuesize, f);
+    //value[readSize] = '\0';
+    v_value[readSize] = '\0';
 }
-
 
 bool Tag::operator==(const Tag& t) const
 {
@@ -233,34 +232,33 @@ int Tag::toInt(int ofs, TagType astype) const
     }
 
     switch (astype) {
-        //case SBYTE: return (signed char)(value[ofs]);
     case TagType::T_SBYTE:
-        return int((reinterpret_cast<signed char*> (value))[ofs]);
+        return int(static_cast<signed char>(v_value[ofs]));
 
     case TagType::T_BYTE:
-        return value[ofs];
+        return v_value[ofs];
 
     case TagType::T_ASCII:
         return 0;
 
     case TagType::T_SSHORT:
-        return (int)int2_to_signed(sget2(value + ofs, order));
+        return (int)int2_to_signed(sget2(v_value.data() + ofs, order));
 
     case TagType::T_SHORT:
-        return (int)sget2(value + ofs, order);
+        return (int)sget2(v_value.data() + ofs, order);
 
     case TagType::T_SLONG:
     case TagType::T_LONG:
-        return (int)sget4(value + ofs, order);
+        return (int)sget4(v_value.data() + ofs, order);
 
     case TagType::T_SRATIONAL: {
-        int a = (int)sget4(value + ofs + 4, order);
-        return a == 0 ? 0 : (int)sget4(value + ofs, order) / a;
+        int a = (int)sget4(v_value.data() + ofs + 4, order);
+        return a == 0 ? 0 : (int)sget4(v_value.data() + ofs, order) / a;
     }
 
     case TagType::T_RATIONAL: {
-        uint32_t a = (uint32_t)sget4(value + ofs + 4, order);
-        return a == 0 ? 0 : (uint32_t)sget4(value + ofs, order) / a;
+        uint32_t a = (uint32_t)sget4(v_value.data() + ofs + 4, order);
+        return a == 0 ? 0 : (uint32_t)sget4(v_value.data() + ofs, order) / a;
     }
 
     case TagType::T_FLOAT:
@@ -287,43 +285,43 @@ double Tag::toDouble(int ofs) const
 
     switch (type) {
     case TagType::T_SBYTE:
-        return (double)(int((reinterpret_cast<signed char*> (value))[ofs]));
+        return (double)(static_cast<signed char>(v_value[ofs]));
 
     case TagType::T_BYTE:
-        return (double)((int)value[ofs]);
+        return (double)((int)v_value[ofs]);
 
     case TagType::T_ASCII:
         return 0.0;
 
     case TagType::T_SSHORT:
-        return (double)int2_to_signed(sget2(value + ofs, order));
+        return (double)int2_to_signed(sget2(v_value.data() + ofs, order));
 
     case TagType::T_SHORT:
-        return (double)((int)sget2(value + ofs, order));
+        return (double)((int)sget2(v_value.data() + ofs, order));
 
     case TagType::T_SLONG:
     case TagType::T_LONG:
-        return (double)((int)sget4(value + ofs, order));
+        return (double)((int)sget4(v_value.data() + ofs, order));
 
     case TagType::T_SRATIONAL:
-        ud = (int)sget4(value + ofs, order);
-        dd = (int)sget4(value + ofs + 4, order);
+        ud = (int)sget4(v_value.data() + ofs, order);
+        dd = (int)sget4(v_value.data() + ofs + 4, order);
         return dd == 0. ? 0. : ud / dd;
 
     case TagType::T_RATIONAL:
-        ud = (uint32_t)sget4(value + ofs, order);
-        dd = (uint32_t)sget4(value + ofs + 4, order);
+        ud = (uint32_t)sget4(v_value.data() + ofs, order);
+        dd = (uint32_t)sget4(v_value.data() + ofs + 4, order);
         return dd == 0. ? 0. : ud / dd;
 
     case TagType::T_FLOAT:
-        conv.i = sget4(value + ofs, order);
-        return conv.f;  // IEEE FLOATs are already C format, they just need a recast
+        conv.i = sget4(v_value.data() + ofs, order);
+        return conv.f;
 
     case TagType::T_UNDEFINED:
         return 0.;
 
     default:
-        return 0.; // Quick fix for missing cases (INVALID, DOUBLE, OLYUNDEF, SUBDIR)
+        return 0.;
     }
 
 }
@@ -338,8 +336,8 @@ void Tag::toString(char* buffer, std::size_t size, int ofs) const
         bool isstring = true;
         unsigned int i = 0;
 
-        for (i = 0; i + ofs < datasize && i < 64 && value[i + ofs]; i++)
-            if (value[i + ofs] < 32 || value[i + ofs] > 126) {
+        for (i = 0; i + ofs < datasize && i < 64 && v_value[i + ofs]; i++)
+            if (v_value[i + ofs] < 32 || v_value[i + ofs] > 126) {
                 isstring = false;
             }
 
@@ -350,15 +348,15 @@ void Tag::toString(char* buffer, std::size_t size, int ofs) const
 
             std::size_t j = 0;
 
-            for (i = 0; i + ofs < datasize && i < 64 && value[i + ofs]; i++) {
-                if (value[i + ofs] == '<' || value[i + ofs] == '>') {
+            for (i = 0; i + ofs < datasize && i < 64 && v_value[i + ofs]; i++) {
+                if (v_value[i + ofs] == '<' || v_value[i + ofs] == '>') {
                     buffer[j++] = '\\';
                     if (j > size - 2) {
                         break;
                     }
                 }
 
-                buffer[j++] = value[i + ofs];
+                buffer[j++] = v_value[i + ofs];
                 if (j > size - 2) {
                     break;
                 }
@@ -369,7 +367,7 @@ void Tag::toString(char* buffer, std::size_t size, int ofs) const
         }
     }
     else if (type == TagType::T_ASCII) {
-        snprintf(buffer, size, "%.64s", value + ofs);
+        snprintf(buffer, size, "%.64s", v_value.data() + ofs);
         return;
     }
 
@@ -390,7 +388,7 @@ void Tag::toString(char* buffer, std::size_t size, int ofs) const
         switch (type) {
         case TagType::T_UNDEFINED:
         case TagType::T_BYTE:
-            snprintf(b, size - len, "%d", value[i + ofs]);
+            snprintf(b, size - len, "%d", v_value[i + ofs]);
             break;
 
         case TagType::T_SSHORT:
@@ -410,11 +408,11 @@ void Tag::toString(char* buffer, std::size_t size, int ofs) const
             break;
 
         case TagType::T_SRATIONAL:
-            snprintf(b, size - len, "%d/%d", (int)sget4(value + 8 * i + ofs, order), (int)sget4(value + 8 * i + ofs + 4, order));
+            snprintf(b, size - len, "%d/%d", (int)sget4(v_value.data() + 8 * i + ofs, order), (int)sget4(v_value.data() + 8 * i + ofs + 4, order));
             break;
 
         case TagType::T_RATIONAL:
-            snprintf(b, size - len, "%u/%u", (uint32_t)sget4(value + 8 * i + ofs, order), (uint32_t)sget4(value + 8 * i + ofs + 4, order));
+            snprintf(b, size - len, "%u/%u", (uint32_t)sget4(v_value.data() + 8 * i + ofs, order), (uint32_t)sget4(v_value.data() + 8 * i + ofs + 4, order));
             break;
 
         case TagType::T_FLOAT:
@@ -449,6 +447,119 @@ Tag* findTag(TagKey tagID, std::vector<Tag>& v_Tags)
 }
 
 
+void SplineToneCurve::Set(const std::vector<double>& v_xy)
+{
+    std::vector<double> v_x;
+    std::vector<double> v_y;
+    std::vector<double> v_ypp;
+
+    const size_t N = v_xy.size() / 2;
+
+    for (int i = 0; i < N; ++i)
+    {
+        v_x.push_back(v_xy[2 * i]);
+        v_y.push_back(v_xy[2 * i + 1]);
+        v_ypp.push_back(0.0);
+    }
+    std::vector<double> v_u(N - 1, 0.0);
+
+    v_ypp[0] = v_u[0] = 0.0;    /* Natural spline */
+
+    for (int i = 1; i < N - 1; ++i) {
+        const double sig = (v_x[i] - v_x[i - 1]) / (v_x[i + 1] - v_x[i - 1]);
+        const double p = sig * v_ypp[i - 1] + 2.0;
+        v_ypp[i] = (sig - 1.0) / p;
+        v_u[i] = ((v_y[i + 1] - v_y[i])
+            / (v_x[i + 1] - v_x[i]) - (v_y[i] - v_y[i - 1]) / (v_x[i] - v_x[i - 1]));
+        v_u[i] = (6.0 * v_u[i] / (v_x[i + 1] - v_x[i - 1]) - sig * v_u[i - 1]) / p;
+    }
+
+    v_ypp[N - 1] = 0.0;
+
+    for (int k = N - 2; k >= 0; --k) {
+        v_ypp[k] = v_ypp[k] * v_ypp[k + 1] + v_u[k];
+    }
+
+    int k_hi = 0;
+
+    for (int i = 0; i < 65536; ++i) {
+
+        float t = float(i) / 65535.f;
+        while ((v_x[k_hi] <= t) && (k_hi < v_x.size() - 1))
+            k_hi++;
+
+        int k_lo = k_hi - 1;
+        double h = v_x[k_hi] - v_x[k_lo];
+        const double a = (v_x[k_hi] - t) / h;
+        const double b = (t - v_x[k_lo]) / h;
+        const double r = a * v_y[k_lo] + b * v_y[k_hi] + ((a * a * a - a) * v_ypp[k_lo] + (b * b * b - b) * v_ypp[k_hi]) * (h * h) * 0.1666666666666666666666666666666;
+
+        ffffToneCurve[i] = (float)(r > 0.0 ? (r < 1.0 ? r : 1.0) : 0.0) * 65535.f;
+    }
+}
+
+void SplineToneCurve::Apply(float& ir, float& ig, float& ib) const
+{
+    float r = std::max<float>(0.0, std::min<float>(65535.0, ir));
+    float g = std::max<float>(0.0, std::min<float>(65535.0, ig));
+    float b = std::max<float>(0.0, std::min<float>(65535.0, ib));
+
+    if (r >= g) {
+        if (g > b) {
+            RGBTone(r, g, b);     // Case 1: r >= g >  b
+        }
+        else if (b > r) {
+            RGBTone(b, r, g);     // Case 2: b >  r >= g
+        }
+        else if (b > g) {
+            RGBTone(r, b, g);     // Case 3: r >= b >  g
+        }
+        else {                           // Case 4: r == g == b
+            r = getval(r);
+            g = getval(g);
+            b = g;
+        }
+    }
+    else {
+        if (r >= b) {
+            RGBTone(g, r, b);     // Case 5: g >  r >= b
+        }
+        else if (b > g) {
+            RGBTone(b, g, r);     // Case 6: b >  g >  r
+        }
+        else {
+            RGBTone(g, b, r);     // Case 7: g >= b >  r
+        }
+    }
+
+    if (!(ir < 0.0 || ir > 65535.0) || !(ig < 0.0 || ig > 65535.0) || !(ib < 0.0 || ib > 65535.0)) {
+        ir = r;
+        ig = g;
+        ib = b;
+    }
+}
+
+void SplineToneCurve::RGBTone(float& maxval, float& medval, float& minval) const
+{
+    const float minvalold = minval, medvalold = medval, maxvalold = maxval;
+
+    maxval = getval(maxval);
+    minval = getval(minval);
+    medval = minval + ((maxval - minval) * (medvalold - minvalold) / (maxvalold - minvalold));
+}
+
+float SplineToneCurve::getval(const float idx) const
+{
+    const int idx_int = (int)idx;
+    const float idx_dec = idx - idx_int;
+
+    if (idx_int < 0)
+        return ffffToneCurve.front();
+    else if (idx_int >= 65535)
+        return ffffToneCurve.back();
+    else
+        return idx_dec * ffffToneCurve[idx_int] + (1.f - idx_dec) * ffffToneCurve[idx_int + 1];
+}
 
 
 DCPProfile::DCPProfile(const std::string filename) :
@@ -735,7 +846,7 @@ DCPProfile::DCPProfile(const std::string filename) :
     int ifdOffset = get4(file, order);
 
     // read tags
-    int numOfTags = get2(file, order);
+    const int numOfTags = get2(file, order);
 
     if (numOfTags <= 0 || numOfTags > 1000) {
         std::cerr << "ERROR : Tag number out of range !" << std::endl;
@@ -747,7 +858,6 @@ DCPProfile::DCPProfile(const std::string filename) :
 
     for (int i = 0; i < numOfTags; i++) {
 
-        //Tag* newTag = new Tag (this, f, base);
         unsigned short tag = get2(file, order);
         TagType type = (TagType)get2(file, order);
         unsigned int datasize = get4(file, order);
@@ -756,14 +866,11 @@ DCPProfile::DCPProfile(const std::string filename) :
             datasize = 1;
         }
 
-        int valuesize;
-
         // filter out invalid tags
         // note the large count is to be able to pass LeafData ASCII tag which can be up to almost 10 megabytes,
         // (only a small part of it will actually be parsed though)
         if ((int)type < 1 || (int)type > 14 || datasize > 10 * 1024 * 1024) {
             type = TagType::T_INVALID;
-            valuesize = 0;
             fclose(file);
             std::cerr << "ERROR : Invalid Tag in dcp file !" << std::endl;
             return;
@@ -952,9 +1059,7 @@ DCPProfile::DCPProfile(const std::string filename) :
     tag = findTag(TagKey::PROFILE_TONE_CURVE, v_tag);
 
     if (tag) {
-        std::vector<double> curve_points = {
-            static_cast<double>(DCT_Spline) // The first value is the curve type
-        };
+        std::vector<double> AS_curve_points;
 
         // Push back each X/Y coordinates in a loop
         bool curve_is_linear = true;
@@ -967,35 +1072,33 @@ DCPProfile::DCPProfile(const std::string filename) :
                 curve_is_linear = false;
             }
 
-            curve_points.push_back(x);
-            curve_points.push_back(y);
+            AS_curve_points.push_back(x);
+            AS_curve_points.push_back(y);
         }
 
         if (!curve_is_linear) {
             // Create the curve
             info.has_tone_curve = true;
-            tone_curve.Set(DiagonalCurve(curve_points, 1000));
+            AS_tone_curve.Set(AS_curve_points);
         }
     } else {
         tag = findTag(TagKey::PROFILE_TONE_COPYRIGHT, v_tag);
 
         if (tag && tag->valueToString().find("Adobe Systems") != std::string::npos) {
-            // An Adobe profile without tone curve is expected to have the Adobe Default Curve, we add that
-            std::vector<double> curve_points = {
-                static_cast<double>(DCT_Spline)
-            };
+            // An Adobe profile without tone curve is expected to have the Adobe Default Curve
+            std::vector<double> AS_curve_points;
 
             constexpr size_t tc_len = sizeof(adobe_camera_raw_default_curve) / sizeof(adobe_camera_raw_default_curve[0]);
 
             for (size_t i = 0; i < tc_len; ++i) {
                 const double x = static_cast<double>(i) / (tc_len - 1);
                 const double y = adobe_camera_raw_default_curve[i];
-                curve_points.push_back(x);
-                curve_points.push_back(y);
+                AS_curve_points.push_back(x);
+                AS_curve_points.push_back(y);
             }
 
             info.has_tone_curve = true;
-            tone_curve.Set(DiagonalCurve(curve_points, 1000));
+            AS_tone_curve.Set(AS_curve_points);
         }
     }
 
@@ -1031,14 +1134,17 @@ DCPProfile::DCPProfile(const std::string filename) :
 
     valid = true;
 
-    gammatab_srgb1(65536);
-    igammatab_srgb1(65536);
+    std::vector<double> gammatab_srgb_data;
+    std::vector<double> igammatab_srgb_data;
     for (int i = 0; i < 65536; i++)
     {
         double x = i / 65535.0;
-        gammatab_srgb1[i] = (x <= 0.003040) ? (x * 12.92310) : (1.055 * exp(log(x) / 2.4) - 0.055);   // from RT
-        igammatab_srgb1[i] = (x <= 0.039286) ? (x / 12.92310) : (exp(log((x + 0.055) / 1.055) * 2.4)); // from RT
+        gammatab_srgb_data.push_back((x <= 0.003040) ? (x * 12.92310) : (1.055 * exp(log(x) / 2.4) - 0.055));   // from RT
+        igammatab_srgb_data.push_back((x <= 0.039286) ? (x / 12.92310) : (exp(log((x + 0.055) / 1.055) * 2.4))); // from RT
     }
+    gammatab_srgb.Set(gammatab_srgb_data);
+    igammatab_srgb.Set(igammatab_srgb_data);
+
 }
 
 DCPProfile::~DCPProfile() = default;
@@ -1046,14 +1152,14 @@ DCPProfile::~DCPProfile() = default;
 static inline bool rgb2hsvdcp(float r, float g, float b, float& h, float& s, float& v)
 {
 
-    float var_Min = std::min<float>(r, std::min<float>(g, b));
+    const float var_Min = std::min<float>(r, std::min<float>(g, b));
 
     if (var_Min < 0.f) {
         return false;
     }
     else {
-        float var_Max = std::max<float>(r, std::max<float>(g, b));
-        float del_Max = var_Max - var_Min;
+        const float var_Max = std::max<float>(r, std::max<float>(g, b));
+        const float del_Max = var_Max - var_Min;
         v = var_Max / 65535.f;
 
         if (fabsf(del_Max) < 0.00001f) {
@@ -1227,7 +1333,7 @@ void DCPProfile::apply(float* rgb, const DCPProfileApplyParams& params) const
 #define CLIPF_0_65535(a) ((a)>0.f?((a)<65535.5f?(a):65535.5f):0.f)
 #define CLIPF_0_1(a) ((a)>0?((a)<1?(a):1):0)
 
-    float exp_scale = (params.apply_baseline_exposure_offset && info.has_baseline_exposure_offset) ? powf(2.0, baseline_exposure_offset) : 1.0;
+    const float exp_scale = (params.apply_baseline_exposure_offset && info.has_baseline_exposure_offset) ? powf(2.0, baseline_exposure_offset) : 1.0;
 
     if (!params.use_tone_curve && !params.apply_look_table) {
         if (exp_scale == 1.f) {
@@ -1283,7 +1389,8 @@ void DCPProfile::apply(float* rgb, const DCPProfileApplyParams& params) const
         }
 
         if (params.use_tone_curve) {
-            tone_curve.Apply(ws_rgb[0], ws_rgb[1], ws_rgb[2]);
+            //tone_curve.Apply(ws_rgb[0], ws_rgb[1], ws_rgb[2]);
+            AS_tone_curve.Apply(ws_rgb[0], ws_rgb[1], ws_rgb[2]);
         }
 
         for (int i = 0; i < 3; i++)
@@ -1297,7 +1404,6 @@ void DCPProfile::apply(float* rgb, const DCPProfileApplyParams& params) const
 
     }
 }
-
 
 inline void DCPProfile::hsdApply(const HsdTableInfo& table_info, const std::vector<HsbModify>& table_base, float& h, float& s, float& v) const
 {
@@ -1350,7 +1456,7 @@ inline void DCPProfile::hsdApply(const HsdTableInfo& table_info, const std::vect
         const float s_scaled = s * table_info.pc.s_scale;
 
         if (table_info.srgb_gamma) {
-            v_encoded = gammatab_srgb1[v * 65535.f];
+            v_encoded = gammatab_srgb[v * 65535.f];
         }
 
         const float v_scaled = v_encoded * table_info.pc.v_scale;
@@ -1415,7 +1521,7 @@ inline void DCPProfile::hsdApply(const HsdTableInfo& table_info, const std::vect
     s *= sat_scale; // No clipping here, we are RT float :-)
 
     if (table_info.srgb_gamma) {
-        v = igammatab_srgb1[v_encoded * val_scale * 65535.f];
+        v = igammatab_srgb[v_encoded * val_scale * 65535.f];
     } else {
         v *= val_scale;
     }

@@ -8,7 +8,6 @@ set(image_files_headers
   convertion.hpp
   convolutionBase.hpp
   convolution.hpp
-  curves.hpp
   dcp.hpp
   diffusion.hpp
   drawing.hpp
@@ -24,7 +23,6 @@ set(image_files_headers
 # Sources
 set(image_files_sources
   convolution.cpp
-  curves.cpp
   dcp.cpp
   filtering.cpp
   io.cpp
