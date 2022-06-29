@@ -453,21 +453,9 @@ void processImage(image::Image<image::RGBAfColor>& image, const ProcessingParams
     {
 #if ALICEVISION_IS_DEFINED(ALICEVISION_HAVE_OPENCV)
 
-        /*float titi = image(0, 0)[0];
-        float titi1 = image(0, 0)[1];
-        float titi2 = image(0, 0)[2];
-
-        std::cout << titi << "," << titi1 << "," << titi2 << std::endl;*/
-
         // Create temporary OpenCV Mat (keep only 3 Channels) to handled Eigen data of our image
         cv::Mat openCVMatIn = image::imageRGBAToCvMatBGR(image, CV_8UC3);
         cv::Mat openCVMatOut(image.Width(), image.Height(), CV_8UC3);
-
-        /*int toto = openCVMatIn.at<cv::Vec3b>(0, 0)[0];
-        int toto1 = openCVMatIn.at<cv::Vec3b>(0, 0)[1];
-        int toto2 = openCVMatIn.at<cv::Vec3b>(0, 0)[2];
-
-        std::cout << toto << "," << toto1 << "," << toto2 << std::endl;*/
 
         cv::fastNlMeansDenoisingColored(openCVMatIn, openCVMatOut, pParams.nlmFilter.filterStrength,
                                         pParams.nlmFilter.filterStrengthColor, pParams.nlmFilter.templateWindowSize,
@@ -476,12 +464,6 @@ void processImage(image::Image<image::RGBAfColor>& image, const ProcessingParams
         // Copy filtered data from openCV Mat(3 channels) to our image(keep the alpha channel unfiltered)
         image::cvMatBGRToImageRGBA(openCVMatOut, image);
 
-        /*float tata = image(0, 0)[0];
-        float tata1 = image(0, 0)[1];
-        float tata2 = image(0, 0)[2];
-
-
-        std::cout << tata << "," << tata1 << "," << tata2 << std::endl;*/
 #else
         throw std::invalid_argument(
             "Unsupported mode! If you intended to use a non-local means filter, please add OpenCV support.");
