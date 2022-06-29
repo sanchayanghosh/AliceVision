@@ -19,7 +19,6 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/photo.hpp>
 #include <opencv2/photo/cuda.hpp>
-#include <opencv2/highgui.hpp>
 #endif
 
 #include <OpenImageIO/imageio.h>
