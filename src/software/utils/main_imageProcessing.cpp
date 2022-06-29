@@ -1,4 +1,3 @@
-
 #include <aliceVision/image/all.hpp>
 #include <aliceVision/system/cmdline.hpp>
 #include <aliceVision/system/Logger.hpp>
@@ -17,6 +16,10 @@
 
 #if ALICEVISION_IS_DEFINED(ALICEVISION_HAVE_OPENCV)
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/photo.hpp>
+#include <opencv2/photo/cuda.hpp>
+#include <opencv2/highgui.hpp>
 #endif
 
 #include <OpenImageIO/imageio.h>
@@ -212,6 +215,39 @@ inline std::istream& operator>>(std::istream& in, EImageFormat& e)
     return in;
 }
 
+struct NLMeansFilterParams
+{
+    bool enabled;
+    float filterStrength;
+    float filterStrengthColor;
+    int templateWindowSize;
+    int searchWindowSize;
+};
+
+std::istream& operator>>(std::istream& in, NLMeansFilterParams& nlmParams)
+{
+    std::string token;
+    in >> token;
+    std::vector<std::string> splitParams;
+    boost::split(splitParams, token, boost::algorithm::is_any_of(":"));
+    if(splitParams.size() != 5)
+        throw std::invalid_argument("Failed to parse NLMeansFilterParams from: " + token);
+    nlmParams.enabled = boost::to_lower_copy(splitParams[0]) == "true";
+    nlmParams.filterStrength = boost::lexical_cast<float>(splitParams[1]);
+    nlmParams.filterStrengthColor = boost::lexical_cast<float>(splitParams[2]);
+    nlmParams.templateWindowSize = boost::lexical_cast<int>(splitParams[3]);
+    nlmParams.searchWindowSize = boost::lexical_cast<int>(splitParams[4]);
+
+    return in;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const NLMeansFilterParams& nlmParams)
+{
+    os << nlmParams.enabled << ":" << nlmParams.filterStrength << ":" << nlmParams.filterStrengthColor << ":"
+       << nlmParams.templateWindowSize << ":" << nlmParams.searchWindowSize;
+    return os;
+}
+
 struct ProcessingParams
 {
     bool reconstructedViewsOnly = false;
@@ -228,6 +264,7 @@ struct ProcessingParams
     {
         false, // enable
         3,     // width
+
         1.0f,  // contrast
         0.0f   // threshold
     };
@@ -255,6 +292,14 @@ struct ProcessingParams
         true // mono
     };
 
+    NLMeansFilterParams nlmFilter = 
+    {
+        false, // enable
+        5.0f,  // filterStrength
+        5.0f,  // filterStrengthColor
+        7,     // templateWindowSize
+        21     // searchWindowSize
+    };
 };
 
 
@@ -402,6 +447,45 @@ void processImage(image::Image<image::RGBAfColor>& image, const ProcessingParams
     {   
         oiio::ImageBuf inBuf(oiio::ImageSpec(image.Width(), image.Height(), nchannels, oiio::TypeDesc::FLOAT), image.data());
         oiio::ImageBufAlgo::noise(inBuf, ENoiseMethod_enumToString(pParams.noise.method), pParams.noise.A, pParams.noise.B, pParams.noise.mono);
+    }
+
+    if(pParams.nlmFilter.enabled)
+    {
+#if ALICEVISION_IS_DEFINED(ALICEVISION_HAVE_OPENCV)
+
+        /*float titi = image(0, 0)[0];
+        float titi1 = image(0, 0)[1];
+        float titi2 = image(0, 0)[2];
+
+        std::cout << titi << "," << titi1 << "," << titi2 << std::endl;*/
+
+        // Create temporary OpenCV Mat (keep only 3 Channels) to handled Eigen data of our image
+        cv::Mat openCVMatIn = image::imageRGBAToCvMatBGR(image, CV_8UC3);
+        cv::Mat openCVMatOut(image.Width(), image.Height(), CV_8UC3);
+
+        /*int toto = openCVMatIn.at<cv::Vec3b>(0, 0)[0];
+        int toto1 = openCVMatIn.at<cv::Vec3b>(0, 0)[1];
+        int toto2 = openCVMatIn.at<cv::Vec3b>(0, 0)[2];
+
+        std::cout << toto << "," << toto1 << "," << toto2 << std::endl;*/
+
+        cv::fastNlMeansDenoisingColored(openCVMatIn, openCVMatOut, pParams.nlmFilter.filterStrength,
+                                        pParams.nlmFilter.filterStrengthColor, pParams.nlmFilter.templateWindowSize,
+                                        pParams.nlmFilter.searchWindowSize);
+
+        // Copy filtered data from openCV Mat(3 channels) to our image(keep the alpha channel unfiltered)
+        image::cvMatBGRToImageRGBA(openCVMatOut, image);
+
+        /*float tata = image(0, 0)[0];
+        float tata1 = image(0, 0)[1];
+        float tata2 = image(0, 0)[2];
+
+
+        std::cout << tata << "," << tata1 << "," << tata2 << std::endl;*/
+#else
+        throw std::invalid_argument(
+            "Unsupported mode! If you intended to use a non-local means filter, please add OpenCV support.");
+#endif
     }
 }
 
@@ -555,14 +639,22 @@ int aliceVision_main(int argc, char * argv[])
             " * TileGridSize: Sets Size Of Grid For Histogram Equalization. Input Image Will Be Divided Into Equally Sized Rectangular Tiles.")
 
         ("noiseFilter", po::value<NoiseFilterParams>(&pParams.noise)->default_value(pParams.noise),
-                                 "Noise Filter parameters:\n"
-                                 " * Enabled: Add Noise.\n"
-                                 " * method: There are several noise types to choose from:\n"
-                                 "    - uniform: adds noise values uninformly distributed on range [A,B).\n"
-                                 "    - gaussian: adds Gaussian (normal distribution) noise values with mean value A and standard deviation B.\n"
-                                 "    - salt: changes to value A a portion of pixels given by B.\n"
-                                 " * A, B: parameters that have a different interpretation depending on the method chosen.\n"
-                                 " * mono: If is true, a single noise value will be applied to all channels otherwise a separate noise value will be computed for each channel.")
+            "Noise Filter parameters:\n"
+            " * Enabled: Add Noise.\n"
+            " * method: There are several noise types to choose from:\n"
+            "    - uniform: adds noise values uninformly distributed on range [A,B).\n"
+            "    - gaussian: adds Gaussian (normal distribution) noise values with mean value A and standard deviation B.\n"
+            "    - salt: changes to value A a portion of pixels given by B.\n"
+            " * A, B: parameters that have a different interpretation depending on the method chosen.\n"
+            " * mono: If is true, a single noise value will be applied to all channels otherwise a separate noise value will be computed for each channel.")
+
+        ("nlmFilter", po::value<NLMeansFilterParams>(&pParams.nlmFilter)->default_value(pParams.nlmFilter),
+            "Non local means Filter parameters:\n"
+            " * Enabled: Use non local means Filter.\n"
+            " * H: Parameter regulating filter strength. Bigger H value perfectly removes noise but also removes image details, smaller H value preserves details but also preserves some noise.\n"
+            " * HColor: Parameter regulating filter strength for color images only. Normally same as Filtering Parameter H. Not necessary for grayscale images\n "
+            " * templateWindowSize: Size in pixels of the template patch that is used to compute weights. Should be odd. \n"
+            " * searchWindowSize:Size in pixels of the window that is used to compute weighted average for given pixel. Should be odd. Affect performance linearly: greater searchWindowsSize - greater denoising time.")
 
         ("outputFormat", po::value<EImageFormat>(&outputFormat)->default_value(outputFormat),
          "Output image format (rgba, rgb, grayscale)")
@@ -624,9 +716,10 @@ int aliceVision_main(int argc, char * argv[])
     }
 
 #if !ALICEVISION_IS_DEFINED(ALICEVISION_HAVE_OPENCV)
-    if(pParams.bilateralFilter.enabled || pParams.claheFilter.enabled)
+    if(pParams.bilateralFilter.enabled || pParams.claheFilter.enabled || pParams.nlmFilter.enabled)
     {
-        ALICEVISION_LOG_ERROR("Invalid option: BilateralFilter and claheFilter can't be used without openCV !");
+        ALICEVISION_LOG_ERROR(
+            "Invalid option: BilateralFilter, claheFilter and nlmFilter can't be used without openCV !");
         return EXIT_FAILURE;
     }
 #endif
