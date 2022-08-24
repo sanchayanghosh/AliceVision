@@ -1,0 +1,79 @@
+name: Docker CI/CD cycle with Image Maintenance in the Github Registry
+
+
+on:
+  push:
+    branches:
+      - docker-build-action
+  
+
+jobs:
+  build-dockerhub-and-push:
+    concurrency: docker_build_action
+    strategy:
+      fail-fast: true
+      matrix:
+        cudaVersion:
+          - 11.7.0
+        ubuntuVersion:
+          - 20.04
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout the git repository
+        uses: actions/checkout@v3
+        with:
+          ref: docker-build-action
+      -
+        name: Set the envrionment variable
+        run: |
+          echo AV_VERSION=$(echo $(git rev-parse --abbrev-ref HEAD)-$(git rev-parse --short HEAD)) >> $GITHUB_ENV
+      -
+        name: Set up Docker Buildx for setting up the Dockerfile
+        uses: docker/setup-buildx-action@v2
+      #1
+      # -
+      #   name: Login to DockerHub if that is what we want to do.
+      #   uses: docker/login-action@v2
+      #   with:
+      #     username: ${{secrets.DOCKER_USERNAME}}
+      #     password: ${{secrets.DOCKER_PASSWORD}}
+      # -
+      #   name: Login to Github Container registry and push it there as well
+      #   uses: docker/login-action@v2
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{github.repository_owner}}
+      #     password: ${{secrets.GITHUB_TOKEN}}
+      -
+        name: List the files that I am using
+        run: |
+          ls -lrt
+      - 
+        name: Actually build and push the docker dependencies container
+        uses: docker/build-push-action@v3
+        with:
+          push: false
+          context: .
+          file: docker/Dockerfile_ubuntu_deps
+          build-args: |
+            CUDA_VERSION=${{matrix.cudaVersion}}
+            UBUNTU_VERSION=${{matrix.ubuntuVersion}}
+          tags: |
+            alicevision/alicevision-deps:${{env.AV_VERSION}}-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
+          
+      - 
+        name: Actually build and push the docker container
+        uses: docker/build-push-action@v3
+        with:
+          push: false
+          context: .
+          file: docker/Dockerfile_ubuntu
+          build-args: |
+            CUDA_VERSION=${{matrix.cudaVersion}}
+            UBUNTU_VERSION=${{matrix.ubuntuVersion}}
+          tags: |
+            alicevision/alicevision:${{env.AV_VERSION}}-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
+            ghcr.io/alicevision/alicevision:${{env.AV_VERSION}}-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
+          
+
