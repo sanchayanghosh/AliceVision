@@ -15,8 +15,6 @@ echo "AV_VERSION: $AV_VERSION"
 echo "CUDA_VERSION: $CUDA_VERSION"
 echo "CENTOS_VERSION: $CENTOS_VERSION"
 
-docker/fetch.sh
-
 ## DEPENDENCIES
 docker build \
 	--rm \

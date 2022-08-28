@@ -63,23 +63,30 @@ ENV PATH="/opt/rh/devtoolset-6/root/usr/bin:${PATH}" \
     MAKE=/opt/rh/devtoolset-6/root/usr/bin/make \
     CMAKE_VERSION=3.21.3
 
-COPY dl/vlfeat_K80L3.SIFT.tree ${AV_INSTALL}/share/aliceVision/
+WORKDIR ${AV_DEV}
+
+COPY CMakeLists.txt ${AV_DEV}/
+
+COPY docker ${AV_DEV}/docker
+
+RUN docker/fetch.sh
+
+RUN mkdir -p ${AV_INSTALL}/share/aliceVision
+
+RUN cp -r dl/vlfeat_K80L3.SIFT.tree ${AV_INSTALL}/share/aliceVision/
 RUN echo "export ALICEVISION_VOCTREE=${AV_INSTALL}/share/aliceVision/vlfeat_K80L3.SIFT.tree" > /etc/profile.d/alicevision.sh
 
 # Manually install cmake
 WORKDIR /opt
-COPY dl/cmake-${CMAKE_VERSION}.tar.gz /tmp
-RUN tar zxf /tmp/cmake-${CMAKE_VERSION}.tar.gz && \
+RUN cp -r ${AV_DEV}/dl/cmake-${CMAKE_VERSION}.tar.gz /tmp
+RUN cd ${AV_DEV} && export CPU_CORE=$(./docker/check-cpu.sh) && cd /opt && tar zxf /tmp/cmake-${CMAKE_VERSION}.tar.gz && \
     rm /tmp/cmake-${CMAKE_VERSION}.tar.gz && \
     cd cmake-${CMAKE_VERSION} && \
     ./bootstrap --parallel="$(nproc)" --prefix=/usr/local  -- -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_USE_OPENSSL:BOOL=ON && \
     make -j"$(nproc)" && \
     make install
 
-
-COPY CMakeLists.txt ${AV_DEV}/
-
-COPY dl/deps ${AV_BUILD}/external/download/
+RUN cp -r ${AV_DEV}/dl/deps ${AV_BUILD}/external/download/
 
 WORKDIR "${AV_BUILD}"
 RUN cmake "${AV_DEV}" \
