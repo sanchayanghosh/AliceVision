@@ -209,7 +209,7 @@ jobs:
       registry:
         image: registry:2
         ports:
-          - 6000:5000
+          - 7000:5000
     strategy:
       fail-fast: true
       matrix:
