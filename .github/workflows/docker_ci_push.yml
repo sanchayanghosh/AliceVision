@@ -11,6 +11,10 @@ on:
       - auto_merge_disabled
       - synchronize
       - edited
+    paths-ignore:
+      - '**.md'
+      - '**.rst'
+      - 'docs/**'
   
 
 jobs:
@@ -79,8 +83,8 @@ jobs:
         name: Pull the latest docker image for the develop branch as developed before
         # if: (steps.changes.outputs.cmake == 'false') && (steps.img_check.outcome == 'success')
         run: |
-          docker pull ${{secrets.DOCKER_USERNAME}}/alicevision:develop-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
-          docker tag ${{secrets.DOCKER_USERNAME}}/alicevision:develop-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}} alicevision/alicevision-deps:${AV_VERSION}-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
+          docker pull ${{secrets.DOCKER_USERNAME}}/alicevision-deps:develop-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
+          docker tag ${{secrets.DOCKER_USERNAME}}/alicevision-deps:develop-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}} alicevision/alicevision-deps:${AV_VERSION}-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
           
           
       # - 
@@ -184,5 +188,122 @@ jobs:
         run: |
           docker build -t alicevision/alicevision:develop-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}} --build-arg UBUNTU_VERSION=${{matrix.ubuntuVersion}} --build-arg CUDA_VERSION=${{matrix.cudaVersion}} --build-arg AV_VERSION=${AV_VERSION} -f docker/Dockerfile_ubuntu .
         
-          
+      -
+        name: Save the docker image for the next stage.
+        run: |
+          docker save -o /tmp/aliceImage.tar alicevision/alicevision:develop-ubuntu${{matrix.ubuntuVersion}}-cuda${{matrix.cudaVersion}}
+
+      -
+        name: Upload the artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: aliceImage
+          path: /tmp/aliceImage.tar
+
+  unit-test-built-image:
+    runs-on: ubuntu-latest
+    concurrency: docker_build_action
+    needs:
+      - build-actual-alicevision-container-ubuntu
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 6000:5000
+    strategy:
+      fail-fast: true
+      matrix:
+        cudaVersion:
+          - 11.7.0
+        ubuntuVersion:
+          - 20.04
+
+    steps:
+      -
+        name: Checkout the git repository
+        uses: actions/checkout@v3
+      -
+        name: Git Submodule update
+        run: |
+          git submodule update --init --force
+
+      -
+        name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: aliceImage
+          path: /tmp
+
+      -
+        name: Load the docker image
+        run: |
+          docker load --input /tmp/aliceImage.tar
+
+      -
+        name: Set the environment variable
+        run: |
+          echo AV_VERSION=$(echo $(git rev-parse --abbrev-ref HEAD)-$(git rev-parse --short HEAD)) >> $GITHUB_ENV
+      
+      - 
+        name: Run unit tests on the image
+        run: |
+          export AV_VERSION=develop
+          export UBUNTU_VERSION=${{matrix.ubuntuVersion}}
+          export CUDA_VERSION=${{matrix.cudaVersion}}
+          chmod +x docker/test_alicevision_unit_test.sh
+          ./docker/test_alicevision_unit_test.sh
+
+  integration-test-built-image:
+    runs-on: ubuntu-latest
+    concurrency: docker_build_action
+    needs:
+      - build-actual-alicevision-container-ubuntu
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 6000:5000
+    strategy:
+      fail-fast: true
+      matrix:
+        cudaVersion:
+          - 11.7.0
+        ubuntuVersion:
+          - 20.04
+
+    steps:
+      -
+        name: Checkout the git repository
+        uses: actions/checkout@v3
+      -
+        name: Git Submodule update
+        run: |
+          git submodule update --init --force
+
+      -
+        name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: aliceImage
+          path: /tmp
+
+      -
+        name: Load the docker image
+        run: |
+          docker load --input /tmp/aliceImage.tar
+      
+      - 
+        name: Run integration tests on the image
+        run: |
+          export AV_VERSION=develop
+          export UBUNTU_VERSION=${{matrix.ubuntuVersion}}
+          export CUDA_VERSION=${{matrix.cudaVersion}}
+          chmod +x docker/test_alicevision_integration_tests.sh
+          ./docker/test_alicevision_integration_tests.sh
+      
+
+      
+
+      
+
 

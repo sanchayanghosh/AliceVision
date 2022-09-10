@@ -1,0 +1,14 @@
+ARG AV_VERSION
+ARG CUDA_VERSION
+ARG UBUNTU_VERSION
+ARG DELETE_BUILD_TRACES=true
+FROM alicevision/alicevision:${AV_VERSION}-ubuntu${UBUNTU_VERSION}-cuda${CUDA_VERSION}
+LABEL maintainer="AliceVision Team alicevision-team@googlegroups.com"
+
+ENV AV_BUILD=/tmp/AliceVision_build
+
+RUN rm -rf ${AV_BUILD}
+
+ENV AV_DEV=/opt/AliceVision_git
+
+RUN rm -rf ${AV_DEV}
